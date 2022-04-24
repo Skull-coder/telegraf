@@ -23,6 +23,29 @@ class WizardContext {
   back () {
     return this.selectStep(this.cursor - 1)
   }
+
+  prevStep(){
+    this.cursor--;
+    if (this.cursor < 0) this.cursor = 0;
+    this.selectStep(this.cursor);
+    return this.steps[this.cursor](this.ctx);
+  }
+  
+  nextStep(ctx) {
+    this.cursor++;
+    if (this.cursor > this.steps.length - 1)
+      this.cursor = this.steps.length - 1;
+    this.selectStep(this.cursor);
+    return this.steps[this.cursor](this.ctx);
+  }
+
+  chooseStep(step) {
+    this.cursor = step;
+    if (this.cursor > this.steps.length - 1)
+      this.cursor = this.steps.length - 1;
+    this.selectStep(this.cursor);
+    return this.steps[this.cursor](this.ctx);
+  }
 }
 
 module.exports = WizardContext

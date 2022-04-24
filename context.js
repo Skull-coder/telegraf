@@ -315,6 +315,12 @@ class TelegrafContext {
     return this.telegram.sendMessage(this.chat.id, ...args)
   }
 
+  async replyOrEdit(...args){
+    this.assert(this.chat, 'replyOrEdit')
+    if ( this.updateType == "callback_query" ) await this.answerCbQuery().catch(err=>err);
+    return this[this.updateType == "callback_query" ? "editMessageText" : "reply"](...args);
+  }
+
   getChat (...args) {
     this.assert(this.chat, 'getChat')
     return this.telegram.getChat(this.chat.id, ...args)
