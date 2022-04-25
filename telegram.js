@@ -1,5 +1,6 @@
 const replicators = require('./core/replicators')
 const ApiClient = require('./core/network/client')
+const { default: axios } = require('axios')
 
 class Telegram extends ApiClient {
   getMe () {
@@ -205,7 +206,19 @@ class Telegram extends ApiClient {
   exportChatInviteLink (chatId) {
     return this.callApi('exportChatInviteLink', { chat_id: chatId })
   }
-
+  
+  createChatInviteLink (chatId, extra) {
+    return this.callApi('createChatInviteLink', { chat_id: chatId, ...extra })
+  }
+  
+  editChatInviteLink (chatId, inviteLink, extra) {
+    return this.callApi('editChatInviteLink', { chat_id: chatId, invite_link: inviteLink, ...extra })
+  }
+  
+  revokeChatInviteLink (chatId, inviteLink) {
+    return this.callApi('revokeChatInviteLink', { chat_id: chatId, invite_link: inviteLink })
+  }
+  
   setChatPhoto (chatId, photo) {
     return this.callApi('setChatPhoto', { chat_id: chatId, photo })
   }
@@ -291,9 +304,7 @@ class Telegram extends ApiClient {
       chat_id: chatId,
       message_id: messageId,
       inline_message_id: inlineMessageId,
-      ...extra.parse_mode && { parse_mode: extra.parse_mode },
-      ...extra.caption_entities && { caption_entities: extra.caption_entities },
-      reply_markup: extra.parse_mode || extra.reply_markup ? extra.reply_markup : extra
+      ...extra
     })
   }
 
@@ -303,10 +314,10 @@ class Telegram extends ApiClient {
       message_id: messageId,
       inline_message_id: inlineMessageId,
       media: {
-        ...media,
         parse_mode: extra.parse_mode,
         caption: extra.caption,
-        caption_entities: extra.caption_entities
+        caption_entities: extra.caption_entities,
+        ...media
       },
       reply_markup: extra.reply_markup ? extra.reply_markup : extra
     })
@@ -418,17 +429,162 @@ class Telegram extends ApiClient {
     })
   }
 
+  async getFileBuffer(message){
+    if (!message) {
+      throw new Error('Message is required')
+    }
+    const type = Object.keys(replicators.copyMethods).find((type) => message[type])
+    if (!type) {
+      console.log(type);
+      throw new Error('Unsupported message type')
+    }
+    
+    var file_id = type == "photo" ? 
+    message.photo[message.photo.length - 1].file_id
+    : type == "document" 
+    ? message.document.file_id
+    : type == "voice"
+    ? message.voice.file_id
+    : type == "audio" 
+    ? message.audio.file_id
+    : type == "video" 
+    ? message.video.file_id
+    : type == "animation"
+    ? message.animation.file_id
+    : type == "video_note"
+    ? message.video_note.file_id
+    : false;
+
+    if ( file_id ){
+      const url = await this.getFileLink(file_id),
+      file = await axios({
+        url,
+        responseType: "arraybuffer"
+      })
+      return file.data;
+    }
+
+    return false;
+  }
+
+  isWithFileId(message){
+    if (!message) {
+      throw new Error('Message is required')
+    }
+    const type = Object.keys(replicators.copyMethods).find((type) => message[type])
+    if (!type) {
+      console.log(type);
+      throw new Error('Unsupported message type')
+    }
+    return ['photo', 'document', 'voice', 'audio', 'video', 'video_note', 'animation'].includes(type);
+  }
+
+  async sendCopy2 (chatId, message, extra, bot, source=false) {
+    if (!message) {
+      throw new Error('Message is required')
+    }
+    
+    const type = Object.keys(replicators.copyMethods).find((type) => message[type])
+    if (!type) {
+      console.log(type);
+      throw new Error('Unsupported message type')
+    }
+    if ( ['photo', 'document', 'voice', 'audio', 'video', 'video_note', 'animation'].includes(type) ){
+        if ( !source ) source = await bot.getFileBuffer(message);
+    }
+
+    if ( type == 'photo' ){
+        return this.sendPhoto(chatId, {
+          source
+        }, {
+          reply_markup: message.reply_markup,
+          caption: message.caption,
+          caption_entities: message.caption_entities, 
+          ...extra
+        })
+    }else if ( type == "document" ){
+     
+        return this.sendDocument(chatId, {
+          source
+        }, {
+          reply_markup: message.reply_markup,
+          caption: message.caption,
+          caption_entities: message.caption_entities, 
+          ...extra
+        });
+    }else if ( type == "voice" ){
+     
+      return this.sendVoice(chatId, {
+        source
+      }, {
+        reply_markup: message.reply_markup,
+        caption: message.caption,
+        caption_entities: message.caption_entities, 
+        ...extra
+      });
+    }else if ( type == "audio" ){
+     
+      return this.sendAudio(chatId, {
+        source
+      }, {
+        reply_markup: message.reply_markup,
+        caption: message.caption,
+        caption_entities: message.caption_entities, 
+        ...extra
+      });
+    }else if ( type == "video" ){
+     
+      return this.sendVideo(chatId, {
+        source
+      }, {
+        reply_markup: message.reply_markup,
+        caption: message.caption,
+        caption_entities: message.caption_entities, 
+        ...extra
+      });
+    }else if ( type == "animation" ){
+    
+      return this.sendAnimation(chatId, {
+        source
+      }, {
+        reply_markup: message.reply_markup,
+        caption: message.caption,
+        caption_entities: message.caption_entities, 
+        ...extra
+      });
+    }else if ( type == "video_note" ){
+     
+      return this.sendVideoNote(chatId, {
+        source
+      }, {
+        reply_markup: message.reply_markup,
+        ...extra
+      });
+    }
+    
+    const opts = {
+      chat_id: chatId,
+      ...replicators[type](message),
+      ...extra
+    }
+    return this.callApi(replicators.copyMethods[type], opts)
+  }
+
   sendCopy (chatId, message, extra) {
     if (!message) {
       throw new Error('Message is required')
     }
-    if (message.chat && message.chat.id && message.message_id) {
-      return this.copyMessage(chatId, message.chat.id, message.message_id, extra)
-    }
+    
+    // if (message.chat && message.chat.id && message.message_id) {
+    //   return this.copyMessage(chatId, message.chat.id, message.message_id, extra)
+    // }
+    
     const type = Object.keys(replicators.copyMethods).find((type) => message[type])
     if (!type) {
+      console.log(type);
       throw new Error('Unsupported message type')
     }
+
     const opts = {
       chat_id: chatId,
       ...replicators[type](message),

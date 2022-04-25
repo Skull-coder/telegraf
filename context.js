@@ -9,7 +9,9 @@ const UpdateTypes = [
   'pre_checkout_query',
   'message',
   'poll',
-  'poll_answer'
+  'poll_answer',
+  'my_chat_member',
+  'chat_member'
 ]
 
 const MessageSubTypes = [
@@ -115,9 +117,17 @@ class TelegrafContext {
   get poll () {
     return this.update.poll
   }
-
+  
   get pollAnswer () {
     return this.update.poll_answer
+  }
+
+  get myChatMember () {
+    return this.update.my_chat_member
+  }
+  
+  get chatMember () {
+    return this.update.chat_member
   }
 
   get chat () {
@@ -125,7 +135,9 @@ class TelegrafContext {
       (this.editedMessage && this.editedMessage.chat) ||
       (this.callbackQuery && this.callbackQuery.message && this.callbackQuery.message.chat) ||
       (this.channelPost && this.channelPost.chat) ||
-      (this.editedChannelPost && this.editedChannelPost.chat)
+      (this.editedChannelPost && this.editedChannelPost.chat) ||
+      (this.myChatMember && this.myChatMember.chat) ||
+      (this.chatMember && this.chatMember.chat)
   }
 
   get from () {
@@ -135,9 +147,12 @@ class TelegrafContext {
       (this.inlineQuery && this.inlineQuery.from) ||
       (this.channelPost && this.channelPost.from) ||
       (this.editedChannelPost && this.editedChannelPost.from) ||
+      (this.myChatMember && this.myChatMember.from) ||
+      (this.chatMember && this.chatMember.from) ||
       (this.shippingQuery && this.shippingQuery.from) ||
       (this.preCheckoutQuery && this.preCheckoutQuery.from) ||
-      (this.chosenInlineResult && this.chosenInlineResult.from)
+      (this.chosenInlineResult && this.chosenInlineResult.from) ||
+      (this.pollAnswer && this.pollAnswer.user) 
   }
 
   get inlineMessageId () {
@@ -313,7 +328,7 @@ class TelegrafContext {
   reply (...args) {
     this.assert(this.chat, 'reply')
     return this.telegram.sendMessage(this.chat.id, ...args)
-  }
+  } 
 
   async replyOrEdit(...args){
     this.assert(this.chat, 'replyOrEdit')
@@ -576,7 +591,7 @@ class TelegrafContext {
   replyWithHTML (html, extra) {
     return this.reply(html, { parse_mode: 'HTML', ...extra })
   }
-
+  
   deleteMessage (messageId) {
     this.assert(this.chat, 'deleteMessage')
     if (typeof messageId !== 'undefined') {
