@@ -74,6 +74,15 @@ class SceneContext {
       : safePassThru()
     return handler(this.ctx, noop).then(() => this.reset())
   }
+
+  async reply (...args) {
+    if ( this.state._last_msg_id ){
+      await this.ctx.telegram.deleteMessage(this.ctx.chat.id, this.state._last_msg_id).catch(err=>err);  
+      this.ctx.updateType = "message";
+    }
+      const msg = await this.ctx.replyOrEdit(...args);
+    this.state._last_msg_id = msg.message_id;
+  }
 }
 
 module.exports = SceneContext
